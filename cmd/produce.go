@@ -56,6 +56,10 @@ Examples:
 			}
 		}
 
+		if deliverAfter > 0 && !deliverAt.IsZero() {
+			return fmt.Errorf("--deliver-after and --deliver-at are mutually exclusive")
+		}
+
 		properties := make(map[string]string)
 		for _, p := range props {
 			parts := strings.SplitN(p, "=", 2)
