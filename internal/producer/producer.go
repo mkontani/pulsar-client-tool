@@ -13,11 +13,13 @@ import (
 )
 
 type Options struct {
-	Topic       string
-	Key         string
-	Properties  map[string]string
-	NumMessages int
-	Rate        float64
+	Topic        string
+	Key          string
+	Properties   map[string]string
+	NumMessages  int
+	Rate         float64
+	DeliverAfter time.Duration
+	DeliverAt    time.Time
 }
 
 // Run sends messages from the given input to the topic.
@@ -38,6 +40,12 @@ func Run(ctx context.Context, c client.PulsarClient, opts Options, message strin
 		}
 		if opts.Key != "" {
 			msg.Key = opts.Key
+		}
+		if opts.DeliverAfter > 0 {
+			msg.DeliverAfter = opts.DeliverAfter
+		}
+		if !opts.DeliverAt.IsZero() {
+			msg.DeliverAt = opts.DeliverAt
 		}
 
 		id, err := p.Send(ctx, msg)
