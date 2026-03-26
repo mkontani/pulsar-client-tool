@@ -14,7 +14,20 @@ type Options struct {
 	Topic            string
 	SubscriptionName string
 	SubscriptionType pulsar.SubscriptionType
+	InitialPosition  pulsar.SubscriptionInitialPosition
 	NumMessages      int
+}
+
+// ParseInitialPosition parses a string into a pulsar.SubscriptionInitialPosition.
+func ParseInitialPosition(s string) (pulsar.SubscriptionInitialPosition, error) {
+	switch s {
+	case "latest", "Latest":
+		return pulsar.SubscriptionPositionLatest, nil
+	case "earliest", "Earliest":
+		return pulsar.SubscriptionPositionEarliest, nil
+	default:
+		return 0, fmt.Errorf("unknown initial position %q (use: earliest, latest)", s)
+	}
 }
 
 // ParseSubscriptionType parses a string into a pulsar.SubscriptionType.
@@ -36,9 +49,10 @@ func ParseSubscriptionType(s string) (pulsar.SubscriptionType, error) {
 // Run subscribes to the topic and consumes messages, writing each to w.
 func Run(ctx context.Context, c client.PulsarClient, opts Options, w io.Writer, outputFmt string) error {
 	consumer, err := c.Subscribe(pulsar.ConsumerOptions{
-		Topic:            opts.Topic,
-		SubscriptionName: opts.SubscriptionName,
-		Type:             opts.SubscriptionType,
+		Topic:                       opts.Topic,
+		SubscriptionName:            opts.SubscriptionName,
+		Type:                        opts.SubscriptionType,
+		SubscriptionInitialPosition: opts.InitialPosition,
 	})
 	if err != nil {
 		return fmt.Errorf("subscribe: %w", err)

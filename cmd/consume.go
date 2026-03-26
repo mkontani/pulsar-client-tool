@@ -37,9 +37,15 @@ Examples:
 		topic, _ := cmd.Flags().GetString("topic")
 		subscription, _ := cmd.Flags().GetString("subscription")
 		subType, _ := cmd.Flags().GetString("subscription-type")
+		initialPos, _ := cmd.Flags().GetString("initial-position")
 		numMessages, _ := cmd.Flags().GetInt("num-messages")
 
 		st, err := consumer.ParseSubscriptionType(subType)
+		if err != nil {
+			return err
+		}
+
+		ip, err := consumer.ParseInitialPosition(initialPos)
 		if err != nil {
 			return err
 		}
@@ -48,6 +54,7 @@ Examples:
 			Topic:            topic,
 			SubscriptionName: subscription,
 			SubscriptionType: st,
+			InitialPosition:  ip,
 			NumMessages:      numMessages,
 		}
 
@@ -61,6 +68,7 @@ func init() {
 	f.StringP("subscription", "s", "", "subscription name (required)")
 	f.StringP("subscription-type", "S", "Exclusive", "subscription type (Exclusive, Shared, Failover, KeyShared)")
 	f.IntP("num-messages", "n", 0, "number of messages to consume (0=unlimited)")
+	f.String("initial-position", "latest", "subscription initial position (earliest, latest)")
 	_ = consumeCmd.MarkFlagRequired("topic")
 	_ = consumeCmd.MarkFlagRequired("subscription")
 	rootCmd.AddCommand(consumeCmd)

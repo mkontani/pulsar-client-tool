@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/mkontani/pulsar-client-tool/internal/client"
 	"github.com/mkontani/pulsar-client-tool/internal/producer"
@@ -43,6 +44,21 @@ Examples:
 		props, _ := cmd.Flags().GetStringSlice("property")
 		numMessages, _ := cmd.Flags().GetInt("num-messages")
 		rate, _ := cmd.Flags().GetFloat64("rate")
+		deliverAfter, _ := cmd.Flags().GetDuration("deliver-after")
+		deliverAtStr, _ := cmd.Flags().GetString("deliver-at")
+
+		var deliverAt time.Time
+		if deliverAtStr != "" {
+			var err error
+			deliverAt, err = time.Parse(time.RFC3339, deliverAtStr)
+			if err != nil {
+				return fmt.Errorf("invalid --deliver-at format, expected RFC3339 (e.g. 2024-01-01T00:00:00Z): %w", err)
+			}
+		}
+
+		if deliverAfter > 0 && !deliverAt.IsZero() {
+			return fmt.Errorf("--deliver-after and --deliver-at are mutually exclusive")
+		}
 
 		properties := make(map[string]string)
 		for _, p := range props {
@@ -54,11 +70,13 @@ Examples:
 		}
 
 		opts := producer.Options{
-			Topic:       topic,
-			Key:         key,
-			Properties:  properties,
-			NumMessages: numMessages,
-			Rate:        rate,
+			Topic:        topic,
+			Key:          key,
+			Properties:   properties,
+			NumMessages:  numMessages,
+			Rate:         rate,
+			DeliverAfter: deliverAfter,
+			DeliverAt:    deliverAt,
 		}
 
 		// Determine input source
@@ -91,6 +109,8 @@ func init() {
 	f.StringSliceP("property", "p", nil, "message property (key=value, repeatable)")
 	f.IntP("num-messages", "n", 1, "number of times to send the message")
 	f.Float64("rate", 0, "messages per second rate limit (0=unlimited)")
+	f.Duration("deliver-after", 0, "delay message delivery by duration (e.g. 10s, 5m)")
+	f.String("deliver-at", "", "deliver message at specific time (RFC3339, e.g. 2024-01-01T00:00:00Z)")
 	_ = produceCmd.MarkFlagRequired("topic")
 	rootCmd.AddCommand(produceCmd)
 }

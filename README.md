@@ -2,7 +2,7 @@
 
 A user-friendly CLI for Apache Pulsar, written in Go.
 
-Provides a simpler alternative to the Java-based `pulsar-client` tool with intuitive commands for producing and consuming messages.
+Provides a simpler alternative to the Java-based `pulsar-client` tool with intuitive commands for producing and consuming messages, delayed/scheduled delivery, and connectivity checks.
 
 ## Installation
 
@@ -37,7 +37,29 @@ pulsar-client-tool produce -t my-topic -m "hello" -k my-key -p env=prod -p versi
 
 # Send 100 messages at 10 msg/sec
 pulsar-client-tool produce -t my-topic -m "load test" -n 100 --rate 10
+
+# Delayed delivery (deliver after 30 seconds)
+pulsar-client-tool produce -t my-topic -m "delayed" --deliver-after 30s
+
+# Scheduled delivery (deliver at a specific time)
+pulsar-client-tool produce -t my-topic -m "scheduled" --deliver-at "2026-04-01T12:00:00Z"
 ```
+
+#### Produce flags
+
+| Flag | Short | Default | Description |
+|------|-------|---------|-------------|
+| `--topic` | `-t` | | Topic to produce to (**required**) |
+| `--message` | `-m` | | Message content to send |
+| `--file` | `-f` | | File to read messages from (one per line) |
+| `--key` | `-k` | | Message key for routing |
+| `--property` | `-p` | | Message property `key=value` (repeatable) |
+| `--num-messages` | `-n` | `1` | Number of times to send the message |
+| `--rate` | | `0` | Messages per second rate limit (`0` = unlimited) |
+| `--deliver-after` | | `0` | Delay message delivery by duration (e.g. `10s`, `5m`) |
+| `--deliver-at` | | | Deliver message at a specific time (RFC3339, e.g. `2024-01-01T00:00:00Z`) |
+
+> `--deliver-after` and `--deliver-at` are mutually exclusive. Delayed delivery only works with `Shared` or `KeyShared` subscription types.
 
 ### Consume messages
 
@@ -53,7 +75,32 @@ pulsar-client-tool consume -t my-topic -s my-sub -o json | jq .
 
 # Shared subscription
 pulsar-client-tool consume -t my-topic -s my-sub -S Shared
+
+# Consume from the beginning of the topic
+pulsar-client-tool consume -t my-topic -s my-sub --initial-position earliest
 ```
+
+#### Consume flags
+
+| Flag | Short | Default | Description |
+|------|-------|---------|-------------|
+| `--topic` | `-t` | | Topic to consume from (**required**) |
+| `--subscription` | `-s` | | Subscription name (**required**) |
+| `--subscription-type` | `-S` | `Exclusive` | Subscription type (`Exclusive`, `Shared`, `Failover`, `KeyShared`) |
+| `--num-messages` | `-n` | `0` | Number of messages to consume (`0` = unlimited) |
+| `--initial-position` | | `latest` | Subscription initial position (`earliest`, `latest`) |
+
+### Check connectivity
+
+```bash
+# Verify the Pulsar cluster is reachable
+pulsar-client-tool ping
+
+# Check a specific service URL
+pulsar-client-tool ping --service-url pulsar://broker:6650
+```
+
+The `ping` command verifies broker responsiveness by performing a full protocol handshake and reports connection latency.
 
 ### Global flags
 
