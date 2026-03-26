@@ -2,139 +2,145 @@
 
 ## Project Overview
 
-`pulsar-client-tool` is a CLI tool for interacting with Apache Pulsar messaging clusters. It provides command-line utilities for producing, consuming, and managing Pulsar topics and messages.
+`pulsar-client-tool` is a Go-based CLI tool for Apache Pulsar, designed as a simpler alternative to the Java-based `pulsar-client`. It provides `produce` and `consume` commands with intuitive flags, environment variable support, and text/JSON output.
 
-**Language:** Go
+**Language:** Go 1.24+
+**Module:** `github.com/mkontani/pulsar-client-tool`
 **Repository:** `mkontani/pulsar-client-tool` (private)
 **Default Branch:** `main`
 
-## Project Status
-
-This project is in early development. The repository is being initialized and the codebase is being built out.
-
-## Expected Project Structure
+## Project Structure
 
 ```
 pulsar-client-tool/
-├── CLAUDE.md           # This file - AI assistant guide
-├── README.md           # Project documentation
-├── go.mod              # Go module definition
-├── go.sum              # Go dependency checksums
-├── main.go             # Application entrypoint
-├── cmd/                # CLI command definitions (cobra/urfave)
-├── internal/           # Internal packages (not exported)
-│   ├── client/         # Pulsar client wrapper
-│   ├── config/         # Configuration handling
-│   └── util/           # Shared utilities
-├── pkg/                # Public/reusable packages
-├── Makefile            # Build and development tasks
-├── Dockerfile          # Container build
-├── .github/            # GitHub Actions CI/CD
-│   └── workflows/
-└── testdata/           # Test fixtures
+├── CLAUDE.md                           # This file
+├── README.md                           # User documentation
+├── Makefile                            # Build targets
+├── go.mod / go.sum                     # Go module deps
+├── main.go                             # Entrypoint → cmd.Execute()
+├── cmd/
+│   ├── root.go                         # Root command, global flags, signal handling
+│   ├── produce.go                      # produce subcommand
+│   ├── consume.go                      # consume subcommand
+│   └── version.go                      # version subcommand
+└── internal/
+    ├── config/
+    │   ├── config.go                   # Config struct, Validate(), ClientOptions()
+    │   └── config_test.go
+    ├── client/
+    │   └── client.go                   # PulsarClient interface + factory
+    ├── producer/
+    │   └── producer.go                 # Send logic (string, file, stdin)
+    ├── consumer/
+    │   ├── consumer.go                 # Receive loop with graceful shutdown
+    │   └── consumer_test.go
+    └── output/
+        ├── output.go                   # Text/JSON message formatter
+        └── output_test.go
 ```
 
+## Architecture
+
+- **cobra** CLI framework with subcommands (`produce`, `consume`, `version`)
+- **Thin cmd layer** — cobra files parse flags and delegate to `internal/` packages
+- **`internal/client.PulsarClient`** interface wraps `pulsar.Client` for testability
+- **`io.Reader`/`io.Writer`** used throughout for testable I/O
+- **`context.Context`** propagated from root command (with `signal.NotifyContext`) for Ctrl+C handling
+- **No global state** — config built in `PersistentPreRunE` and passed via context
+
+### Key Dependencies
+
+- `github.com/spf13/cobra` — CLI framework
+- `github.com/apache/pulsar-client-go` — Pulsar client library
+
 ## Development Workflow
-
-### Prerequisites
-
-- Go 1.21+ (use the version specified in `go.mod`)
-- Apache Pulsar instance for integration testing (or use the standalone Docker image)
 
 ### Common Commands
 
 ```bash
-# Build
-go build -o pulsar-client-tool .
-
-# Run tests
-go test ./...
-
-# Run tests with race detector
-go test -race ./...
-
-# Lint (if golangci-lint is configured)
-golangci-lint run
-
-# Format code
-gofmt -w .
-go vet ./...
-
-# Tidy dependencies
-go mod tidy
+make build        # Build binary → ./pulsar-client-tool
+make test         # go test ./...
+make vet          # go vet ./...
+make fmt          # gofmt -w .
+make lint         # golangci-lint run
+make clean        # Remove binary
+go mod tidy       # After changing dependencies
 ```
 
-### Build with Makefile (when available)
+### Quick Verification
 
 ```bash
-make build        # Build binary
-make test         # Run tests
-make lint         # Run linter
-make clean        # Clean build artifacts
+go build ./... && go vet ./... && go test ./...
 ```
+
+## CLI Commands
+
+### produce
+
+Sends messages to a Pulsar topic. Message source priority:
+1. `--message "text"` — literal string
+2. `--file path` — one message per line
+3. stdin (if piped)
+
+Key flags: `-t/--topic` (required), `-m/--message`, `-f/--file`, `-k/--key`, `-p/--property` (repeatable), `-n/--num-messages`, `--rate`
+
+### consume
+
+Subscribes and receives messages. Runs until Ctrl+C or `--num-messages` reached.
+
+Key flags: `-t/--topic` (required), `-s/--subscription` (required), `-S/--subscription-type`, `-n/--num-messages`
+
+### Global flags
+
+- `--service-url` / `PULSAR_SERVICE_URL` (default: `pulsar://localhost:6650`)
+- `--auth-token` / `PULSAR_AUTH_TOKEN`
+- `--tls-cert`, `--tls-key`, `--tls-ca`
+- `--timeout` (default: `30s`)
+- `-o/--output` (`text` or `json`)
 
 ## Code Conventions
 
 ### Go Standards
 
-- Follow standard Go project layout conventions
-- Use `gofmt` for formatting (no exceptions)
-- Run `go vet` to catch common issues
-- Exported functions and types must have doc comments
-- Error messages should be lowercase, without trailing punctuation
+- `gofmt` for formatting, `go vet` for correctness
+- Error messages: lowercase, no trailing punctuation
+- Wrap errors with context: `fmt.Errorf("operation: %w", err)`
+- `context.Context` as first parameter for I/O functions
 - Prefer returning errors over panicking
-- Use `context.Context` as the first parameter for functions that do I/O
 
 ### Naming
 
-- Package names: short, lowercase, no underscores (e.g., `client`, `config`)
-- Interfaces: use `-er` suffix where appropriate (e.g., `Producer`, `Consumer`)
-- Test files: `*_test.go` alongside the code they test
-- Constants: `CamelCase` for exported, `camelCase` for unexported
-
-### Error Handling
-
-- Wrap errors with context using `fmt.Errorf("operation: %w", err)`
-- Check errors immediately after the call that produces them
-- Do not ignore errors silently — handle or explicitly document why it's safe
+- Package names: short, lowercase, no underscores
+- `PulsarClient` interface in `internal/client/` for testability
+- Test files: `*_test.go` alongside source
 
 ### Testing
 
-- Table-driven tests are preferred for multiple test cases
-- Use `testify` or standard library assertions
-- Name test functions descriptively: `TestProducer_SendMessage_WithTimeout`
-- Place test helpers in `_test.go` files or a `testutil` package
-
-## Pulsar-Specific Conventions
-
-- Use the official Apache Pulsar Go client: `github.com/apache/pulsar-client-go`
-- Connection configuration (service URL, auth) should be configurable via flags, env vars, and config file
-- Support common Pulsar operations: produce, consume, list topics, manage subscriptions
-- Handle Pulsar client lifecycle properly — always close clients and producers/consumers
+- Table-driven tests preferred
+- Standard library `testing` package (no external assertion library required)
+- Unit tests run without a live Pulsar instance
+- Integration tests (future): use `//go:build integration` tag
 
 ## Configuration Priority
 
-Configuration should follow this precedence (highest to lowest):
-1. CLI flags
-2. Environment variables (prefixed, e.g., `PULSAR_SERVICE_URL`)
-3. Configuration file (e.g., `~/.pulsar-client-tool.yaml`)
-4. Sensible defaults
+1. CLI flags (highest)
+2. Environment variables (`PULSAR_SERVICE_URL`, `PULSAR_AUTH_TOKEN`)
+3. Sensible defaults (lowest)
 
 ## AI Assistant Guidelines
 
 ### When Making Changes
 
-- Read existing code before modifying — understand the patterns in use
+- Read existing code before modifying — follow established patterns
 - Run `go build ./...` after changes to verify compilation
 - Run `go test ./...` after changes to verify tests pass
-- Run `go mod tidy` if dependencies were added or removed
+- Run `go mod tidy` if dependencies changed
 - Keep changes focused — one concern per commit
 
 ### Commit Messages
 
-- Use conventional style: `feat:`, `fix:`, `refactor:`, `test:`, `docs:`, `chore:`
-- Keep the subject line under 72 characters
-- Use imperative mood: "Add feature" not "Added feature"
+- Conventional style: `feat:`, `fix:`, `refactor:`, `test:`, `docs:`, `chore:`
+- Under 72 characters, imperative mood
 
 ### What to Avoid
 
