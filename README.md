@@ -2,7 +2,7 @@
 
 A user-friendly CLI for Apache Pulsar, written in Go.
 
-Provides a simpler alternative to the Java-based `pulsar-client` tool with intuitive commands for producing and consuming messages.
+Provides a simpler alternative to the Java-based `pulsar-client` tool with intuitive commands for producing and consuming messages, delayed/scheduled delivery, and connectivity checks.
 
 ## Installation
 
@@ -37,6 +37,12 @@ pulsar-client-tool produce -t my-topic -m "hello" -k my-key -p env=prod -p versi
 
 # Send 100 messages at 10 msg/sec
 pulsar-client-tool produce -t my-topic -m "load test" -n 100 --rate 10
+
+# Delayed delivery (deliver after 30 seconds)
+pulsar-client-tool produce -t my-topic -m "delayed" --deliver-after 30s
+
+# Scheduled delivery (deliver at a specific time)
+pulsar-client-tool produce -t my-topic -m "scheduled" --deliver-at "2026-04-01T12:00:00Z"
 ```
 
 ### Consume messages
@@ -53,6 +59,19 @@ pulsar-client-tool consume -t my-topic -s my-sub -o json | jq .
 
 # Shared subscription
 pulsar-client-tool consume -t my-topic -s my-sub -S Shared
+
+# Consume from the beginning of the topic
+pulsar-client-tool consume -t my-topic -s my-sub --initial-position earliest
+```
+
+### Check connectivity
+
+```bash
+# Verify the Pulsar cluster is reachable
+pulsar-client-tool ping
+
+# Check a specific service URL
+pulsar-client-tool ping --service-url pulsar://broker:6650
 ```
 
 ### Global flags
