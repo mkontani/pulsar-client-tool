@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"strings"
 	"time"
 
 	"github.com/apache/pulsar-client-go/pulsar"
@@ -20,6 +21,7 @@ type Options struct {
 	Rate         float64
 	DeliverAfter time.Duration
 	DeliverAt    time.Time
+	Separator    string
 }
 
 // Run sends messages from the given input to the topic.
@@ -93,22 +95,62 @@ func Run(ctx context.Context, c client.PulsarClient, opts Options, message strin
 		return nil
 	}
 
-	// Send from reader (stdin or file), one message per line
+	// Send from reader (stdin or file)
 	if input != nil {
 		scanner := bufio.NewScanner(input)
 		first := true
-		for scanner.Scan() {
-			select {
-			case <-ctx.Done():
-				return ctx.Err()
-			default:
+
+		if opts.Separator != "" {
+			// Multi-line mode: accumulate lines until separator line is found
+			var lines []string
+			for scanner.Scan() {
+				line := scanner.Text()
+				if line == opts.Separator {
+					if len(lines) > 0 {
+						select {
+						case <-ctx.Done():
+							return ctx.Err()
+						default:
+						}
+						if !first {
+							throttle()
+						}
+						first = false
+						msg := strings.Join(lines, "\n")
+						if err := send([]byte(msg)); err != nil {
+							return err
+						}
+						lines = lines[:0]
+					}
+				} else {
+					lines = append(lines, line)
+				}
 			}
-			if !first {
-				throttle()
+			// Send remaining lines as final message
+			if len(lines) > 0 {
+				if !first {
+					throttle()
+				}
+				msg := strings.Join(lines, "\n")
+				if err := send([]byte(msg)); err != nil {
+					return err
+				}
 			}
-			first = false
-			if err := send(scanner.Bytes()); err != nil {
-				return err
+		} else {
+			// Default: one message per line
+			for scanner.Scan() {
+				select {
+				case <-ctx.Done():
+					return ctx.Err()
+				default:
+				}
+				if !first {
+					throttle()
+				}
+				first = false
+				if err := send(scanner.Bytes()); err != nil {
+					return err
+				}
 			}
 		}
 		return scanner.Err()
