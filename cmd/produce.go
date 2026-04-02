@@ -43,6 +43,7 @@ Examples:
 		key, _ := cmd.Flags().GetString("key")
 		props, _ := cmd.Flags().GetStringSlice("property")
 		separator, _ := cmd.Flags().GetString("separator")
+		raw, _ := cmd.Flags().GetBool("raw")
 		numMessages, _ := cmd.Flags().GetInt("num-messages")
 		rate, _ := cmd.Flags().GetFloat64("rate")
 		deliverAfter, _ := cmd.Flags().GetDuration("deliver-after")
@@ -79,6 +80,7 @@ Examples:
 			DeliverAfter: deliverAfter,
 			DeliverAt:    deliverAt,
 			Separator:    separator,
+			Raw:          raw,
 		}
 
 		// Determine input source
@@ -111,6 +113,7 @@ func init() {
 	f.StringSliceP("property", "p", nil, "message property (key=value, repeatable)")
 	f.IntP("num-messages", "n", 1, "number of times to send the message")
 	f.StringP("separator", "d", "", `message delimiter for file/stdin input (default: newline). Use "---" or blank line separator with ""`)
+	f.Bool("raw", false, "read entire file/stdin as a single message (preserves newlines)")
 	f.Float64("rate", 0, "messages per second rate limit (0=unlimited)")
 	f.Duration("deliver-after", 0, "delay message delivery by duration (e.g. 10s, 5m)")
 	f.String("deliver-at", "", "deliver message at specific time (RFC3339, e.g. 2024-01-01T00:00:00Z)")

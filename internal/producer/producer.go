@@ -2,6 +2,7 @@ package producer
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -22,6 +23,7 @@ type Options struct {
 	DeliverAfter time.Duration
 	DeliverAt    time.Time
 	Separator    string
+	Raw          bool
 }
 
 // Run sends messages from the given input to the topic.
@@ -97,6 +99,19 @@ func Run(ctx context.Context, c client.PulsarClient, opts Options, message strin
 
 	// Send from reader (stdin or file)
 	if input != nil {
+		if opts.Raw {
+			// Read entire input as a single message
+			data, err := io.ReadAll(input)
+			if err != nil {
+				return fmt.Errorf("read input: %w", err)
+			}
+			payload := bytes.TrimRight(data, "\n")
+			if len(payload) == 0 {
+				return fmt.Errorf("no message provided: input is empty")
+			}
+			return send(payload)
+		}
+
 		scanner := bufio.NewScanner(input)
 		first := true
 
