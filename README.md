@@ -38,6 +38,20 @@ pulsar-client-tool produce -t my-topic -m "hello" -k my-key -p env=prod -p versi
 # Send 100 messages at 10 msg/sec
 pulsar-client-tool produce -t my-topic -m "load test" -n 100 --rate 10
 
+# Send a multi-line message (entire file as one message)
+pulsar-client-tool produce -t my-topic -f pretty.json --raw
+
+# Send multi-line content from stdin
+cat <<'EOF' | pulsar-client-tool produce -t my-topic --raw
+{
+  "name": "test",
+  "value": 123
+}
+EOF
+
+# Send multiple multi-line messages split by a delimiter
+pulsar-client-tool produce -t my-topic -f messages.txt -d "---"
+
 # Delayed delivery (deliver after 30 seconds)
 pulsar-client-tool produce -t my-topic -m "delayed" --deliver-after 30s
 
@@ -55,6 +69,8 @@ pulsar-client-tool produce -t my-topic -m "scheduled" --deliver-at "2026-04-01T1
 | `--key` | `-k` | | Message key for routing |
 | `--property` | `-p` | | Message property `key=value` (repeatable) |
 | `--num-messages` | `-n` | `1` | Number of times to send the message |
+| `--separator` | `-d` | | Message delimiter for file/stdin input (e.g. `---`) |
+| `--raw` | | `false` | Read entire file/stdin as a single message |
 | `--rate` | | `0` | Messages per second rate limit (`0` = unlimited) |
 | `--deliver-after` | | `0` | Delay message delivery by duration (e.g. `10s`, `5m`) |
 | `--deliver-at` | | | Deliver message at a specific time (RFC3339, e.g. `2024-01-01T00:00:00Z`) |
