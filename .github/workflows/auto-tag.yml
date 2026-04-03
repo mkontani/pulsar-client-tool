@@ -1,0 +1,77 @@
+name: Auto Tag
+
+on:
+  pull_request:
+    types: [closed]
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  tag:
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Determine bump type from PR title
+        id: bump
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          if [[ "$PR_TITLE" == \[major\]* ]]; then
+            echo "type=major" >> "$GITHUB_OUTPUT"
+          elif [[ "$PR_TITLE" == \[minor\]* ]]; then
+            echo "type=minor" >> "$GITHUB_OUTPUT"
+          elif [[ "$PR_TITLE" == \[patch\]* ]]; then
+            echo "type=patch" >> "$GITHUB_OUTPUT"
+          else
+            echo "type=" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Compute next version
+        if: steps.bump.outputs.type != ''
+        id: version
+        env:
+          BUMP: ${{ steps.bump.outputs.type }}
+        run: |
+          # Get latest semver tag (fallback to v0.0.0)
+          latest=$(git tag --list 'v*' --sort=-version:refname | head -n1)
+          if [ -z "$latest" ]; then
+            latest="v0.0.0"
+          fi
+
+          # Parse major.minor.patch
+          version="${latest#v}"
+          IFS='.' read -r major minor patch <<< "$version"
+
+          case "$BUMP" in
+            major)
+              major=$((major + 1))
+              minor=0
+              patch=0
+              ;;
+            minor)
+              minor=$((minor + 1))
+              patch=0
+              ;;
+            patch)
+              patch=$((patch + 1))
+              ;;
+          esac
+
+          next="v${major}.${minor}.${patch}"
+          echo "tag=$next" >> "$GITHUB_OUTPUT"
+          echo "Next version: $next"
+
+      - name: Create and push tag
+        if: steps.bump.outputs.type != ''
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          git tag "$TAG"
+          git push origin "$TAG"
